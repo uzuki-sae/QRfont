@@ -1,24 +1,27 @@
 """QR コードのフォント（OpenType/CFF）を作る。
 
-1 マス = CELL 単位、1em = 29 マス。右下の白抜き部分には、
-IPAexゴシックの字形を縮めて描く（このためフォント全体が IPA フォントライセンスの派生プログラムになる）。
+1 マス = CELL 単位、1em = 29 マス。右下の白抜き部分には、元フォントの字形を縮めて描く。
+
+- 日本語版 QR Font: 元フォントは BIZ UDゴシック
+- 繁体字版 QR Font TC: 元フォントは台北黑體（Taipei Sans TC Beta、Source Han Sans の派生）
+
+どちらの元フォントも SIL Open Font License 1.1 なので、作るフォントも同じライセンスになる。
 """
 
-import os
+from dataclasses import dataclass
 from pathlib import Path
+from typing import Callable
 
 from fontTools.fontBuilder import FontBuilder
 from fontTools.pens.t2CharStringPen import T2CharStringPen
 from fontTools.pens.transformPen import TransformPen
 from fontTools.ttLib import TTFont
 
-from qrfont.charset import load_charset
+from qrfont.charset import load_charset, load_charset_tc
 from qrfont.qr import SIZE, label_box, labeled_matrix
 
-FAMILY = "QR Font"
 STYLE = "Regular"
-PS_NAME = "QRFont-Regular"
-VERSION = "0.1.0"
+VERSION = "0.2.0"
 
 CELL = 40
 UPM = CELL * SIZE  # 1160
@@ -28,10 +31,52 @@ DESCENT = ASCENT - UPM  # -160
 # 白抜き部分のうち字の em が占める割合（周りの黒マスと字の線がくっつかないように少し空ける）
 LABEL_SCALE = 0.9
 
-# IPAexゴシック Ver.004.01（ipaexg00401.zip の ipaexg.ttf）を置く。環境変数 QRFONT_SOURCE で上書きできる
-SOURCE_FONT = Path(
-    os.environ.get("QRFONT_SOURCE", Path(__file__).resolve().parent.parent / "source" / "ipaexg.ttf")
+SOURCE_DIR = Path(__file__).resolve().parent.parent / "source"
+
+OFL = "SIL Open Font License, Version 1.1"
+OFL_DESCRIPTION = (
+    f"This Font Software is licensed under the {OFL}. "
+    "This license is available with a FAQ at: https://openfontlicense.org"
 )
+
+
+@dataclass(frozen=True)
+class Variant:
+    family: str
+    ps_name: str
+    source: Path  # 右下の字形を借りる元フォント
+    charset: Callable[[], list]
+    copyright: str
+    codepages: int  # OS/2 ulCodePageRange1
+
+
+JP = Variant(
+    family="QR Font",
+    ps_name="QRFont-Regular",
+    source=SOURCE_DIR / "BIZUDGothic-Regular.ttf",
+    charset=load_charset,
+    copyright=(
+        "Copyright 2022 The BIZ UDGothic Project Authors "
+        "(https://github.com/googlefonts/morisawa-biz-ud-gothic). "
+        f"QR Font is a modified version of BIZ UDGothic, licensed under the {OFL}."
+    ),
+    codepages=(1 << 0) | (1 << 17),  # Latin 1, JIS/Japan
+)
+
+TC = Variant(
+    family="QR Font TC",
+    ps_name="QRFontTC-Regular",
+    source=SOURCE_DIR / "TaipeiSansTCBeta-Regular.ttf",
+    charset=load_charset_tc,
+    copyright=(
+        "Taipei Sans TC Beta by JT Foundry (bit.ly/jtfoundry) is a modified font of Source Han Sans. "
+        "Source Han Sans: Copyright Adobe (http://www.adobe.com/), with Reserved Font Name 'Source'. "
+        f"QR Font TC is a modified version of Taipei Sans TC Beta, licensed under the {OFL}."
+    ),
+    codepages=(1 << 0) | (1 << 20),  # Latin 1, Chinese: Traditional
+)
+
+VARIANTS = {"jp": JP, "tc": TC}
 
 
 def glyph_name(ch):
@@ -97,9 +142,9 @@ def build_glyph(ch, source):
     return pen.getCharString()
 
 
-def build_font(out_path, source_path=SOURCE_FONT):
-    source = _Source(source_path)
-    chars = load_charset()
+def build_font(out_path, variant=JP):
+    source = _Source(variant.source)
+    chars = variant.charset()
     missing = [ch for ch in chars if not source.has(ch)]
     if missing:
         raise ValueError(f"元フォントに無い字: {''.join(missing)}")
@@ -116,24 +161,21 @@ def build_font(out_path, source_path=SOURCE_FONT):
     for ch in chars:
         charstrings[glyph_name(ch)] = build_glyph(ch, source)
 
-    fb.setupCFF(PS_NAME, {"FullName": f"{FAMILY} {STYLE}"}, charstrings, {})
+    family, ps_name = variant.family, variant.ps_name
+    fb.setupCFF(ps_name, {"FullName": f"{family} {STYLE}"}, charstrings, {})
     fb.setupHorizontalMetrics({n: (UPM, 0) for n in names})
     fb.setupHorizontalHeader(ascent=ASCENT, descent=DESCENT)
     fb.setupNameTable(
         {
-            "copyright": (
-                "Copyright(c) Information-technology Promotion Agency, Japan (IPA), 2003-2012. "
-                "This font is a Derived Program of IPAex Gothic and is distributed under "
-                "the IPA Font License Agreement v1.0."
-            ),
-            "familyName": FAMILY,
+            "copyright": variant.copyright,
+            "familyName": family,
             "styleName": STYLE,
-            "uniqueFontIdentifier": f"{PS_NAME};{VERSION}",
-            "fullName": f"{FAMILY} {STYLE}",
-            "psName": PS_NAME,
+            "uniqueFontIdentifier": f"{ps_name};{VERSION}",
+            "fullName": f"{family} {STYLE}",
+            "psName": ps_name,
             "version": f"Version {VERSION}",
-            "licenseDescription": "IPA Font License Agreement v1.0",
-            "licenseInfoURL": "https://moji.or.jp/ipafont/license/",
+            "licenseDescription": OFL_DESCRIPTION,
+            "licenseInfoURL": "https://openfontlicense.org",
         }
     )
     fb.setupOS2(
@@ -143,7 +185,7 @@ def build_font(out_path, source_path=SOURCE_FONT):
         usWinAscent=ASCENT,
         usWinDescent=-DESCENT,
         fsType=0,
-        ulCodePageRange1=(1 << 0) | (1 << 17),  # Latin 1, JIS/Japan
+        ulCodePageRange1=variant.codepages,
     )
     fb.setupPost()
     fb.save(str(out_path))
