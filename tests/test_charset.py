@@ -1,6 +1,14 @@
 import unittest
 
-from qrfont.charset import BOPOMOFO, load_big5_hanzi, load_charset, load_charset_tc, load_jis_level1, load_joyo
+from qrfont.charset import (
+    BOPOMOFO,
+    load_big5_hanzi,
+    load_charset,
+    load_charset_jp,
+    load_charset_tc,
+    load_jis_level1,
+    load_joyo,
+)
 
 
 class TestJoyo(unittest.TestCase):
@@ -37,9 +45,9 @@ class TestJisLevel1(unittest.TestCase):
             self.assertNotIn(ch, level1)
 
 
-class TestCharset(unittest.TestCase):
+class TestCharsetJP(unittest.TestCase):
     def setUp(self):
-        self.chars = load_charset()
+        self.chars = load_charset_jp()
 
     def test_重複がない(self):
         self.assertEqual(len(self.chars), len(set(self.chars)))
@@ -100,3 +108,19 @@ class TestCharsetTC(unittest.TestCase):
     def test_空白とかなは入らない(self):
         for ch in " あア":
             self.assertNotIn(ch, self.chars)
+
+
+class TestCharsetMerged(unittest.TestCase):
+    def setUp(self):
+        self.chars = load_charset()
+
+    def test_日本語の字と繁体字の字を合わせたもの(self):
+        self.assertEqual(set(self.chars), set(load_charset_jp()) | set(load_charset_tc()))
+        self.assertEqual(len(self.chars), 13824)
+
+    def test_重複がない(self):
+        self.assertEqual(len(self.chars), len(set(self.chars)))
+
+    def test_日本語の字が先に並ぶ(self):
+        jp = load_charset_jp()
+        self.assertEqual(self.chars[: len(jp)], jp)

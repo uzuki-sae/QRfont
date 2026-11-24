@@ -4,23 +4,29 @@ from pathlib import Path
 
 from fontTools.ttLib import TTFont
 
-from qrfont.font import JP, TC, UPM, build_font
+from qrfont.charset import load_charset, load_charset_jp
+from qrfont.font import FAMILY, PS_NAME, UPM, build_font, label_source
 from qrfont.render import decode_text, render_char
 
 
-class _FontTests:
-    """日本語版・繁体字版に共通のテスト。VARIANT を決めたサブクラスで動かす。"""
+class TestLabelSource(unittest.TestCase):
+    def test_日本語版にある字はBIZ_UDゴシック(self):
+        for ch in "亜骨角者Aあ":
+            self.assertEqual(label_source(ch), "jp")
 
-    VARIANT = None
-    SAMPLE = None  # 右下に字が描かれているかを見る字
+    def test_繁体字だけの字は台北黑體(self):
+        for ch in "臺灣體龘ㄅˊ":
+            self.assertEqual(label_source(ch), "tc")
 
+
+class TestFont(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         cls.tmp = tempfile.TemporaryDirectory()
-        cls.path = Path(cls.tmp.name) / f"{cls.VARIANT.ps_name}.otf"
-        build_font(cls.path, cls.VARIANT)
+        cls.path = Path(cls.tmp.name) / f"{PS_NAME}.otf"
+        build_font(cls.path)
         cls.font = TTFont(cls.path)
-        cls.chars = cls.VARIANT.charset()
+        cls.chars = load_charset()
 
     @classmethod
     def tearDownClass(cls):
@@ -43,45 +49,30 @@ class _FontTests:
         widths = {self.font["hmtx"][cmap[ord(ch)]][0] for ch in self.chars}
         self.assertEqual(widths, {UPM})
 
-    def test_フォント名とライセンス(self):
+    def test_フォント名(self):
         name = self.font["name"]
-        self.assertEqual(name.getDebugName(1), self.VARIANT.family)
-        self.assertEqual(name.getDebugName(6), self.VARIANT.ps_name)
+        self.assertEqual(name.getDebugName(1), FAMILY)
+        self.assertEqual(name.getDebugName(6), PS_NAME)
+        # Source Han Sans の予約フォント名 "Source" は派生フォントの名前に使えない
+        self.assertNotIn("Source", FAMILY)
+        self.assertNotIn("Source", PS_NAME)
+
+    def test_両方の元フォントの著作権表示とOFL(self):
+        name = self.font["name"]
+        copyright_ = name.getDebugName(0)
+        for word in ("BIZ UDGothic", "Taipei Sans TC", "Source Han Sans"):
+            self.assertIn(word, copyright_)
+        self.assertNotIn("IPA", copyright_)
         self.assertIn("SIL Open Font License", name.getDebugName(13))
-        self.assertNotIn("IPA", name.getDebugName(0))
 
     def test_右下に字が描かれている(self):
-        img = render_char(self.path, self.SAMPLE, 290)
-        cell = 290 // 29
-        top = (29 - 4 - 6) * cell
-        patch = img.crop((top, top, (29 - 4) * cell, (29 - 4) * cell))
-        self.assertLess(patch.getextrema()[0], 128)
+        for ch in "亜臺":
+            img = render_char(self.path, ch, 290)
+            cell = 290 // 29
+            top = (29 - 4 - 6) * cell
+            patch = img.crop((top, top, (29 - 4) * cell, (29 - 4) * cell))
+            self.assertLess(patch.getextrema()[0], 128, ch)
 
     def test_全グリフが読み取れて元の字に戻る(self):
         failed = [ch for ch in self.chars if decode_text(render_char(self.path, ch, 116)) != ch]
         self.assertEqual(failed, [])
-
-
-class TestFontJP(_FontTests, unittest.TestCase):
-    VARIANT = JP
-    SAMPLE = "亜"
-
-    def test_日本語版の名前(self):
-        self.assertEqual(JP.family, "QR Font")
-        self.assertIn("BIZ UDGothic", self.font["name"].getDebugName(0))
-
-
-class TestFontTC(_FontTests, unittest.TestCase):
-    VARIANT = TC
-    SAMPLE = "體"
-
-    def test_繁体字版の名前(self):
-        self.assertEqual(TC.family, "QR Font TC")
-        copyright_ = self.font["name"].getDebugName(0)
-        self.assertIn("Taipei Sans TC", copyright_)
-        self.assertIn("Source Han Sans", copyright_)
-
-    def test_繁体字版の名前に予約フォント名を使わない(self):
-        # Source Han Sans の予約フォント名 "Source" は派生フォントの名前に使えない
-        self.assertNotIn("Source", TC.family)
-        self.assertNotIn("Source", TC.ps_name)

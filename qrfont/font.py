@@ -2,25 +2,26 @@
 
 1 マス = CELL 単位、1em = 29 マス。右下の白抜き部分には、元フォントの字形を縮めて描く。
 
-- 日本語版 QR Font: 元フォントは BIZ UDゴシック
-- 繁体字版 QR Font TC: 元フォントは台北黑體（Taipei Sans TC Beta、Source Han Sans の派生）
+- 日本語の字（常用漢字・JIS 第一水準・かな・ASCII）: BIZ UDゴシック
+- 繁体字だけにある字（Big5 漢字・注音符號）: 台北黑體（Taipei Sans TC Beta、Source Han Sans の派生）
 
 どちらの元フォントも SIL Open Font License 1.1 なので、作るフォントも同じライセンスになる。
 """
 
-from dataclasses import dataclass
+from functools import cache
 from pathlib import Path
-from typing import Callable
 
 from fontTools.fontBuilder import FontBuilder
 from fontTools.pens.t2CharStringPen import T2CharStringPen
 from fontTools.pens.transformPen import TransformPen
 from fontTools.ttLib import TTFont
 
-from qrfont.charset import load_charset, load_charset_tc
+from qrfont.charset import load_charset, load_charset_jp
 from qrfont.qr import SIZE, label_box, labeled_matrix
 
+FAMILY = "QR Font"
 STYLE = "Regular"
+PS_NAME = "QRFont-Regular"
 VERSION = "0.2.0"
 
 CELL = 40
@@ -32,51 +33,33 @@ DESCENT = ASCENT - UPM  # -160
 LABEL_SCALE = 0.9
 
 SOURCE_DIR = Path(__file__).resolve().parent.parent / "source"
+SOURCES = {
+    "jp": SOURCE_DIR / "BIZUDGothic-Regular.ttf",
+    "tc": SOURCE_DIR / "TaipeiSansTCBeta-Regular.ttf",
+}
 
 OFL = "SIL Open Font License, Version 1.1"
+COPYRIGHT = (
+    "Copyright 2022 The BIZ UDGothic Project Authors "
+    "(https://github.com/googlefonts/morisawa-biz-ud-gothic). "
+    "Taipei Sans TC Beta by JT Foundry (bit.ly/jtfoundry) is a modified font of Source Han Sans. "
+    "Source Han Sans: Copyright Adobe (http://www.adobe.com/), with Reserved Font Name 'Source'. "
+    f"QR Font is a modified version of BIZ UDGothic and Taipei Sans TC Beta, licensed under the {OFL}."
+)
 OFL_DESCRIPTION = (
     f"This Font Software is licensed under the {OFL}. "
     "This license is available with a FAQ at: https://openfontlicense.org"
 )
 
 
-@dataclass(frozen=True)
-class Variant:
-    family: str
-    ps_name: str
-    source: Path  # 右下の字形を借りる元フォント
-    charset: Callable[[], list]
-    copyright: str
-    codepages: int  # OS/2 ulCodePageRange1
+@cache
+def _jp_chars():
+    return frozenset(load_charset_jp())
 
 
-JP = Variant(
-    family="QR Font",
-    ps_name="QRFont-Regular",
-    source=SOURCE_DIR / "BIZUDGothic-Regular.ttf",
-    charset=load_charset,
-    copyright=(
-        "Copyright 2022 The BIZ UDGothic Project Authors "
-        "(https://github.com/googlefonts/morisawa-biz-ud-gothic). "
-        f"QR Font is a modified version of BIZ UDGothic, licensed under the {OFL}."
-    ),
-    codepages=(1 << 0) | (1 << 17),  # Latin 1, JIS/Japan
-)
-
-TC = Variant(
-    family="QR Font TC",
-    ps_name="QRFontTC-Regular",
-    source=SOURCE_DIR / "TaipeiSansTCBeta-Regular.ttf",
-    charset=load_charset_tc,
-    copyright=(
-        "Taipei Sans TC Beta by JT Foundry (bit.ly/jtfoundry) is a modified font of Source Han Sans. "
-        "Source Han Sans: Copyright Adobe (http://www.adobe.com/), with Reserved Font Name 'Source'. "
-        f"QR Font TC is a modified version of Taipei Sans TC Beta, licensed under the {OFL}."
-    ),
-    codepages=(1 << 0) | (1 << 20),  # Latin 1, Chinese: Traditional
-)
-
-VARIANTS = {"jp": JP, "tc": TC}
+def label_source(ch):
+    """字 ch の右下の字形をどちらの元フォントから取るか。日本語の字は "jp"、それ以外は "tc"。"""
+    return "jp" if ch in _jp_chars() else "tc"
 
 
 def glyph_name(ch):
@@ -142,10 +125,10 @@ def build_glyph(ch, source):
     return pen.getCharString()
 
 
-def build_font(out_path, variant=JP):
-    source = _Source(variant.source)
-    chars = variant.charset()
-    missing = [ch for ch in chars if not source.has(ch)]
+def build_font(out_path):
+    sources = {key: _Source(path) for key, path in SOURCES.items()}
+    chars = load_charset()
+    missing = [ch for ch in chars if not sources[label_source(ch)].has(ch)]
     if missing:
         raise ValueError(f"元フォントに無い字: {''.join(missing)}")
 
@@ -159,20 +142,19 @@ def build_font(out_path, variant=JP):
     empty = T2CharStringPen(UPM, None).getCharString()
     charstrings = {".notdef": empty, "space": T2CharStringPen(UPM, None).getCharString()}
     for ch in chars:
-        charstrings[glyph_name(ch)] = build_glyph(ch, source)
+        charstrings[glyph_name(ch)] = build_glyph(ch, sources[label_source(ch)])
 
-    family, ps_name = variant.family, variant.ps_name
-    fb.setupCFF(ps_name, {"FullName": f"{family} {STYLE}"}, charstrings, {})
+    fb.setupCFF(PS_NAME, {"FullName": f"{FAMILY} {STYLE}"}, charstrings, {})
     fb.setupHorizontalMetrics({n: (UPM, 0) for n in names})
     fb.setupHorizontalHeader(ascent=ASCENT, descent=DESCENT)
     fb.setupNameTable(
         {
-            "copyright": variant.copyright,
-            "familyName": family,
+            "copyright": COPYRIGHT,
+            "familyName": FAMILY,
             "styleName": STYLE,
-            "uniqueFontIdentifier": f"{ps_name};{VERSION}",
-            "fullName": f"{family} {STYLE}",
-            "psName": ps_name,
+            "uniqueFontIdentifier": f"{PS_NAME};{VERSION}",
+            "fullName": f"{FAMILY} {STYLE}",
+            "psName": PS_NAME,
             "version": f"Version {VERSION}",
             "licenseDescription": OFL_DESCRIPTION,
             "licenseInfoURL": "https://openfontlicense.org",
@@ -185,7 +167,7 @@ def build_font(out_path, variant=JP):
         usWinAscent=ASCENT,
         usWinDescent=-DESCENT,
         fsType=0,
-        ulCodePageRange1=variant.codepages,
+        ulCodePageRange1=(1 << 0) | (1 << 17) | (1 << 20),  # Latin 1, JIS/Japan, Chinese: Traditional
     )
     fb.setupPost()
     fb.save(str(out_path))

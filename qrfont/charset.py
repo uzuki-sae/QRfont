@@ -29,8 +29,8 @@ def _range(first, last):
     return [chr(c) for c in range(ord(first), ord(last) + 1)]
 
 
-def load_charset():
-    """QR にする字の一覧（空白を除く）。ASCII・かな・漢字の順。"""
+def load_charset_jp():
+    """日本語の字の一覧（空白を除く）。ASCII・かな・漢字の順。"""
     ascii_chars = [chr(c) for c in range(0x21, 0x7F)]
     hiragana = _range("ぁ", "ゖ") + ["ゝ", "ゞ"]
     katakana = _range("ァ", "ヺ") + ["・", "ー", "ヽ", "ヾ"]
@@ -60,6 +60,13 @@ def load_big5_hanzi():
 
 
 def load_charset_tc():
-    """繁体字版で QR にする字の一覧（空白を除く）。ASCII・注音符號・漢字の順。"""
+    """繁体字の字の一覧（空白を除く）。ASCII・注音符號・漢字の順。"""
     ascii_chars = [chr(c) for c in range(0x21, 0x7F)]
     return ascii_chars + list(BOPOMOFO) + load_big5_hanzi()
+
+
+def load_charset():
+    """QR にする字の一覧（空白を除く）。日本語の字のあとに、繁体字だけにある字を並べる。"""
+    jp = load_charset_jp()
+    seen = set(jp)
+    return jp + [ch for ch in load_charset_tc() if ch not in seen]

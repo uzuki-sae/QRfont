@@ -1,5 +1,7 @@
 Copyright 2022 The BIZ UDGothic Project Authors (https://github.com/googlefonts/morisawa-biz-ud-gothic)
-QR Font (fonts/QRFont-Regular.otf) is a modified version of BIZ UDGothic.
+Taipei Sans TC Beta by JT Foundry (bit.ly/jtfoundry), a modified font of Source Han Sans.
+Source Han Sans: Copyright Adobe (http://www.adobe.com/), with Reserved Font Name 'Source'.
+QR Font (fonts/QRFont-Regular.otf) is a modified version of BIZ UDGothic and Taipei Sans TC Beta.
 
 This Font Software is licensed under the SIL Open Font License, Version 1.1.
 This license is copied below, and is also available with a FAQ at:
