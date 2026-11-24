@@ -36,3 +36,30 @@ def load_charset():
     katakana = _range("ァ", "ヺ") + ["・", "ー", "ヽ", "ヾ"]
     kanji = sorted(set(load_joyo()) | set(load_jis_level1()) | set(TOLERATED))
     return ascii_chars + hiragana + katakana + kanji
+
+
+# 注音符號（ㄅ〜ㄩ）と声調記号（˙ˉˊˇˋ）
+BOPOMOFO = "".join(chr(c) for c in range(0x3105, 0x312A)) + "˙ˉˊˇˋ"
+
+
+def load_big5_hanzi():
+    """Big5 の漢字（常用字 A440〜C67E と次常用字 C940〜F9D5、計 13,051 字）を符号順に返す。
+
+    Python の big5 には C6A1 以降に ETEN のかな・記号も入っているので、CJK 統合漢字だけを取る。
+    """
+    chars = []
+    for lead in range(0xA4, 0xFA):
+        for trail in list(range(0x40, 0x7F)) + list(range(0xA1, 0xFF)):
+            try:
+                ch = bytes([lead, trail]).decode("big5")
+            except UnicodeDecodeError:
+                continue
+            if "一" <= ch <= "鿿":
+                chars.append(ch)
+    return chars
+
+
+def load_charset_tc():
+    """繁体字版で QR にする字の一覧（空白を除く）。ASCII・注音符號・漢字の順。"""
+    ascii_chars = [chr(c) for c in range(0x21, 0x7F)]
+    return ascii_chars + list(BOPOMOFO) + load_big5_hanzi()

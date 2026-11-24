@@ -1,15 +1,32 @@
 # QR Font
 
-1 字ごとに、その字を記録した QR コードを字形にしたフォントです。QR の右下には、その字そのものを小さく描いています。
+1 字ごとに、その字を記録した QR コードを字形にしたフォントです。QR の右下には、その字そのものを小さく描いています。日本語版と繁体字版があります。
 
-![大きさ別の見本](docs/sample.png)
+| | 日本語版 | 繁体字版 |
+|---|---|---|
+| フォント | [fonts/QRFont-Regular.otf](fonts/QRFont-Regular.otf) | [fonts/QRFontTC-Regular.otf](fonts/QRFontTC-Regular.otf) |
+| ファミリー名 | `QR Font` | `QR Font TC` |
+| 右下の字形 | [BIZ UDゴシック](https://github.com/googlefonts/morisawa-biz-ud-gothic) Regular | [台北黑體 Taipei Sans TC Beta](https://bit.ly/jtfoundry) Regular |
+| 収録 | 3,275 字 | 13,187 字 |
 
-- フォント: [fonts/QRFont-Regular.otf](fonts/QRFont-Regular.otf)（OpenType/CFF、ファミリー名 `QR Font`）
-- 収録: 3,275 字
-  - ASCII の印字可能文字 94 字（空白は QR にせず、字幅だけの空白）
-  - ひらがな（ぁ〜ゖ、ゝゞ）、カタカナ（ァ〜ヺ、・ーヽヾ）
-  - 漢字: 常用漢字（2,136 字）と JIS X 0208 第一水準漢字（2,965 字）を合わせたもの。
-    常用漢字表の 𠮟・塡・剝・頰 に対して広く使われている 叱・填・剥・頬 も入れています
+形式はどちらも OpenType/CFF です。
+
+### 日本語版の収録字
+
+![日本語版の見本](docs/sample.png)
+
+- ASCII の印字可能文字 94 字（空白は QR にせず、字幅だけの空白）
+- ひらがな（ぁ〜ゖ、ゝゞ）、カタカナ（ァ〜ヺ、・ーヽヾ）
+- 漢字: 常用漢字（2,136 字）と JIS X 0208 第一水準漢字（2,965 字）を合わせたもの。
+  常用漢字表の 𠮟・塡・剝・頰 に対して広く使われている 叱・填・剥・頬 も入れています
+
+### 繁体字版の収録字
+
+![繁体字版の見本](docs/sample-tc.png)
+
+- ASCII の印字可能文字 94 字（空白は日本語版と同じ）
+- 注音符號（ㄅ〜ㄩ）と声調記号（˙ˉˊˇˋ）の 42 字
+- 漢字: Big5 の常用字と次常用字の 13,051 字
 
 ## QR の形式
 
@@ -25,16 +42,16 @@
 
 ## 使える最小の大きさ
 
-| 1em の大きさ | QR の読み取り（3,275 字中） | 右下の字（目視） |
-|---|---|---|
-| 29px（1 マス 1px） | 3,011 字 | 読めない |
-| 38px（1 マス 1.31px） | 3,172 字 | 読めない |
-| 44px（1 マス 1.52px） | 全字 | 読めない |
-| 58px（1 マス 2px） | 全字 | ほぼ読めない |
-| 87px（1 マス 3px） | 全字 | 画数の少ない字は読める。鬱・驚のような字は潰れる |
-| 116px（1 マス 4px） | 全字 | 画数の多い字もおおむね読める |
+| 1em の大きさ | QR の読み取り（日本語版 3,275 字中） | QR の読み取り（繁体字版 13,187 字中） | 右下の字（目視） |
+|---|---|---|---|
+| 29px（1 マス 1px） | 3,035 字 | 12,256 字 | 読めない |
+| 38px（1 マス 1.31px） | 3,178 字 | 12,758 字 | 読めない |
+| 44px（1 マス 1.52px） | 全字 | 13,186 字（罺 だけ読めない） | 読めない |
+| 58px（1 マス 2px） | 全字 | 全字 | ほぼ読めない |
+| 87px（1 マス 3px） | 全字 | 全字 | 画数の少ない字は読める。鬱・驚・龘のような字は潰れる |
+| 116px（1 マス 4px） | 全字 | 全字 | 画数の多い字もおおむね読める |
 
-- QR だけなら 44px から全字読めました。余裕を見て 58px 以上を勧めます
+- QR だけなら 58px から両方の版の全字が読めました。58px 以上を勧めます
 - 右下の字まで読ませるなら、画数の少ない字で 87px、画数の多い字も含めるなら 116px が最小です
 - 1 マスが整数の画素になる大きさ（29 の倍数: 58・87・116px…）で使うと、マスの境目がにじみません
 - 読み取りの確認は PC 上の OpenCV（`cv2.QRCodeDetector` と `cv2.QRCodeDetectorAruco`）で行いました。スマートフォンのカメラでの確認はまだです
@@ -43,14 +60,16 @@
 
 Python 3 と fontTools・qrcode・opencv-python・Pillow を使います。
 
-1. [IPAexフォント Ver.004.01](https://moji.or.jp/ipafont/ipaex00401/) の `ipaexg00401.zip` を取得し、中の `ipaexg.ttf` を `source/ipaexg.ttf` に置く（別の場所なら環境変数 `QRFONT_SOURCE` で指定）
+1. 元フォントを `source/` に置く
+   - [morisawa-biz-ud-gothic](https://github.com/googlefonts/morisawa-biz-ud-gothic) の `fonts/ttf/BIZUDGothic-Regular.ttf`（Version 1.051）
+   - [翰字鑄造 JT Foundry](https://bit.ly/jtfoundry) の台北黑體 `TaipeiSansTCBeta-Regular.ttf`（Version 1.000）
 2. フォントを作る
 
 ```bash
 python scripts/build.py
 ```
 
-テスト（全字のグリフを描いて QR として読み、元の字に戻ることを確かめる）:
+テスト（両方の版の全字のグリフを描いて QR として読み、元の字に戻ることを確かめる）:
 
 ```bash
 python -m unittest
@@ -60,14 +79,16 @@ python -m unittest
 
 ```bash
 python scripts/render_sample.py
-python scripts/measure_min_size.py 58 87 116
+python scripts/measure_min_size.py jp 58 87 116
+python scripts/measure_min_size.py tc 58 87 116
 ```
 
 ## ライセンス
 
-右下の字形は IPAexゴシック（Ver.004.01）の輪郭を縮めて使っています。このためこのフォントは IPAexゴシックの「派生プログラム」であり、[IPA フォントライセンス v1.0](LICENSE.txt) の下で公開します。生成スクリプトとテストも同じ条件で配布します。
-
-- オリジナル・プログラム（IPAexゴシック）へ置き換えるには、上記の配布ページから `ipaexg00401.zip` を取得し、その `ipaexg.ttf` を使ってください
+- フォント: [SIL Open Font License 1.1](https://openfontlicense.org)
+  - 日本語版は BIZ UDゴシックの改変版です（[OFL.txt](OFL.txt)）
+  - 繁体字版は台北黑體の改変版です。台北黑體は Source Han Sans の改変版です（[OFL-TC.txt](OFL-TC.txt)）。Source Han Sans の予約フォント名「Source」は使っていません
+- 生成スクリプトとテスト: [MIT License](LICENSE)
 - 常用漢字の一覧（[data/joyo.txt](data/joyo.txt)）は常用漢字表（平成22年内閣告示第2号）の字を表の順に並べたものです。
   ウィキペディア日本語版「常用漢字一覧」の表から字だけを取り出して作りました
 - 「QR コード」は株式会社デンソーウェーブの登録商標です
